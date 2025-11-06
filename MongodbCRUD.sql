@@ -13,10 +13,8 @@ db.students.updateOne(
 );
 db.students.updateMany(
   { city: "Pune" },
-  { $inc: { marks: 5 } } // adds +5 to marks
+  { $inc: { marks: 5 } } 
 );
-db.students.save({ _id: 10, name: "Kiran", age: 18, marks: 80, city: "Delhi" });
-db.students.save({ _id: 1, name: "Ravi", age: 18, marks: 95, city: "Pune" });
 db.students.deleteOne({ name: "Raj" });
 db.students.deleteMany({ city: "Mumbai" });
 db.students.find().pretty();
