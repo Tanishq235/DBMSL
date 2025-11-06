@@ -1,23 +1,18 @@
-CREATE DATABASE exp7;
-\c exp7
-
-DROP TABLE IF EXISTS library_audit;
-DROP TABLE IF EXISTS library;
 
 CREATE TABLE library (
-book_id SERIAL PRIMARY KEY,
-book_name VARCHAR(50),
-status VARCHAR(20)
+  book_id   SERIAL PRIMARY KEY,
+  book_name TEXT NOT NULL,
+  status    TEXT
 );
 
 CREATE TABLE library_audit (
-audit_id SERIAL PRIMARY KEY,
-event_time TIMESTAMP,
-book_name VARCHAR(50),
-old_status VARCHAR(20),
-new_status VARCHAR(20),
-action VARCHAR(20),
-trigger_type VARCHAR(30)
+  audit_id   SERIAL PRIMARY KEY,
+  book_id    INT,
+  book_name  TEXT,
+  action     TEXT,       
+  old_status TEXT,
+  new_status TEXT,
+  changed_at TIMESTAMP DEFAULT now()
 );
 
 INSERT INTO library (book_name, status) VALUES
@@ -27,49 +22,29 @@ INSERT INTO library (book_name, status) VALUES
 ('SPIDER-MAN', 'UNAVAILABLE'),
 ('UNCHARTED', 'AVAILABLE');
 
-CREATE OR REPLACE FUNCTION row_audit_func()
+CREATE OR REPLACE FUNCTION library_audit_trigger()
 RETURNS TRIGGER AS $$
 BEGIN
-IF TG_OP = 'UPDATE' THEN
-INSERT INTO library_audit (event_time, book_name, old_status, new_status, action, trigger_type)
-VALUES (NOW(), OLD.book_name, OLD.status, NEW.status, 'UPDATE', 'ROW-LEVEL AFTER');
-ELSIF TG_OP = 'DELETE' THEN
-INSERT INTO library_audit (event_time, book_name, old_status, new_status, action, trigger_type)
-VALUES (NOW(), OLD.book_name, OLD.status, NULL, 'DELETE', 'ROW-LEVEL AFTER');
-END IF;
-
-```
-RETURN NULL;
-```
-
+  IF TG_OP = 'UPDATE' THEN
+    INSERT INTO library_audit(book_id, book_name, action, old_status, new_status, changed_at)
+    VALUES (OLD.book_id, OLD.book_name, 'UPDATE', OLD.status, NEW.status, now());
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO library_audit(book_id, book_name, action, old_status, new_status, changed_at)
+    VALUES (OLD.book_id, OLD.book_name, 'DELETE', OLD.status, NULL, now());
+  END IF;
+  RETURN NULL; 
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER row_level_audit
+CREATE TRIGGER trg_library_audit
 AFTER UPDATE OR DELETE ON library
 FOR EACH ROW
-EXECUTE FUNCTION row_audit_func();
-
-
-CREATE OR REPLACE FUNCTION stmt_audit_func()
-RETURNS TRIGGER AS $$
-BEGIN
-INSERT INTO library_audit (event_time, book_name, old_status, new_status, action, trigger_type)
-VALUES (NOW(), NULL, NULL, NULL, TG_OP, 'STATEMENT-LEVEL BEFORE');
-RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER stmt_level_audit
-BEFORE UPDATE OR DELETE ON library
-FOR EACH STATEMENT
-EXECUTE FUNCTION stmt_audit_func();
+EXECUTE FUNCTION library_audit_trigger();
 
 
 UPDATE library SET status = 'UNAVAILABLE' WHERE book_name = 'UNCHARTED';
-
 DELETE FROM library WHERE book_name = 'SILENT HILL';
 
-SELECT * FROM library;
 
+SELECT * FROM library;
 SELECT * FROM library_audit ORDER BY audit_id;
